@@ -11,6 +11,9 @@ Los manifiestos de Argo CD (`AppProject`, `Application`, `ApplicationSet`) se do
 ```
 argocd-namespaces/
 ├── README.md
+├── bootstrap/                          # ApplicationSet → openshift-gitops (no va a overlays/)
+│   ├── README.md
+│   └── applicationset-workshop-namespaces.yaml
 ├── cluster/
 │   ├── kustomization.yaml              # resources: [] (sin Application Argo por ahora)
 │   └── networkpolicy-deny-all-traffic.yaml
@@ -198,9 +201,17 @@ kubectl kustomize .../overlays/desarrollo | grep -E '^kind:'
 
 ## Repositorio Git
 
-Sustituye `REPO_URL` y `TARGET_REVISION` por tu remoto y rama.
+Remoto: [workshop-namespaces-argocd](https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git), rama `main`. La raíz del repo coincide con esta carpeta (`base/`, `cluster/`, `overlays/`, `bootstrap/`).
 
-Ruta asumida en los ejemplos de Argo: `workshop/automatizacion-namespace/argocd-namespaces/`
+## Bootstrap Argo CD
+
+El **ApplicationSet** está en `bootstrap/applicationset-workshop-namespaces.yaml` y usa el **AppProject `seguridad`** ya creado en `openshift-gitops`.
+
+```bash
+oc apply -f bootstrap/applicationset-workshop-namespaces.yaml -n openshift-gitops
+```
+
+Detalle en [bootstrap/README.md](bootstrap/README.md).
 
 ## Personalización
 
@@ -228,103 +239,8 @@ ln /opt/workshop/automatizacion-namespace/argocd-namespaces/base/limitrange-defa
    /opt/workshop/automatizacion-namespace/argocd-namespaces/overlays/desarrollo/limitrange.yaml
 ```
 
----
-
-## Manifiestos Argo CD (copiar y adaptar)
-
-### AppProject
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: AppProject
-metadata:
-  name: workshop-namespaces
-  namespace: openshift-gitops
-spec:
-  description: Namespaces desarrollo, qa y produccion del workshop
-  sourceRepos:
-    - REPO_URL
-  destinations:
-    - namespace: '*'
-      server: https://kubernetes.default.svc
-  namespaceResourceWhitelist:
-    - group: ''
-      kind: Namespace
-    - group: ''
-      kind: LimitRange
-    - group: ''
-      kind: ResourceQuota
-    - group: networking.k8s.io
-      kind: NetworkPolicy
-```
-
-### ApplicationSet — una Application por overlay
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: ApplicationSet
-metadata:
-  name: workshop-namespaces
-  namespace: openshift-gitops
-spec:
-  goTemplate: true
-  goTemplateOptions: ["missingkey=error"]
-  generators:
-    - git:
-        repoURL: REPO_URL
-        revision: TARGET_REVISION
-        directories:
-          - path: workshop/automatizacion-namespace/argocd-namespaces/overlays/*
-  template:
-    metadata:
-      name: 'ns-{{.path.basename}}'
-      labels:
-        workshop.openshift.io/etapa: automatizacion-namespace
-    spec:
-      project: workshop-namespaces
-      source:
-        repoURL: REPO_URL
-        targetRevision: TARGET_REVISION
-        path: '{{.path.path}}'
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: '{{.path.basename}}'
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=false
-```
-
-`destination.namespace` y `metadata.name` del `Namespace` deben coincidir con el nombre de la carpeta (`desarrollo`, `qa`, `produccion`).
-
-### Application manual (ejemplo desarrollo)
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: ns-desarrollo
-  namespace: openshift-gitops
-spec:
-  project: workshop-namespaces
-  source:
-    repoURL: REPO_URL
-    targetRevision: TARGET_REVISION
-    path: workshop/automatizacion-namespace/argocd-namespaces/overlays/desarrollo
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: desarrollo
-  syncPolicy:
-    automated:
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
-```
-
 ## Orden de despliegue recomendado (cuando aplique)
 
-1. `AppProject` `workshop-namespaces`
-2. `ApplicationSet` `workshop-namespaces`
+1. AppProject **`seguridad`** (ya existente en el clúster)
+2. `oc apply -f bootstrap/applicationset-workshop-namespaces.yaml -n openshift-gitops`
 3. Por namespace: comprobar `Namespace`, `ResourceQuota`, `LimitRange`, `NetworkPolicy` `deny-all-traffic`

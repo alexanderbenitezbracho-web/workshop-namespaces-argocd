@@ -1,0 +1,36 @@
+# Aplicar una vez en el clúster (AppProject "seguridad" ya existe):
+#   oc apply -f bootstrap/applicationset-workshop-namespaces.yaml -n openshift-gitops
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: workshop-namespaces
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git
+        revision: main
+        directories:
+          - path: overlays/*
+  template:
+    metadata:
+      name: 'ns-{{.path.basename}}'
+      labels:
+        workshop.openshift.io/etapa: automatizacion-namespace
+    spec:
+      project: seguridad
+      source:
+        repoURL: https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git
+        targetRevision: main
+        path: '{{.path.path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{.path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=false
