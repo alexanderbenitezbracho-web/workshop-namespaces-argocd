@@ -1,0 +1,14 @@
+# Política adicional solo para producción (no está en base/).
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: produccion-quota
+spec:
+  hard:
+    count/deployments.apps: "50"
+    requests.cpu: "200m"
+    limits.cpu: "2"
+    requests.memory: 500Mi
+    limits.memory: 5Gi
+    requests.storage: 12Gi
+    pods: "50"

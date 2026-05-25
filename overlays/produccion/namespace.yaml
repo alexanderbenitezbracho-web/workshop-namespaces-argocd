@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: produccion
+  labels:
+    workshop.openshift.io/etapa: automatizacion-namespace
+    workshop.openshift.io/entorno: produccion
+  annotations:
+    openshift.io/description: Namespace de producción del workshop
+    openshift.io/display-name: Producción

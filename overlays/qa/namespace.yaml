@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: qa
+  labels:
+    workshop.openshift.io/etapa: automatizacion-namespace
+    workshop.openshift.io/entorno: qa
+  annotations:
+    openshift.io/description: Namespace de QA del workshop
+    openshift.io/display-name: QA

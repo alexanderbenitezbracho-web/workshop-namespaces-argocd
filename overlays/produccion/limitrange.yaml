@@ -1,0 +1,29 @@
+# Alineado con overlays/produccion/resourcequota.yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: workshop-default-limits
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 50m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 4m
+        memory: 10Mi
+      max:
+        cpu: "2"
+        memory: 5Gi
+      min:
+        cpu: 40m
+        memory: 100Mi
+    - type: Pod
+      max:
+        cpu: "2"
+        memory: 5Gi
+    - type: PersistentVolumeClaim
+      max:
+        storage: 12Gi
+      min:
+        storage: 1Gi
