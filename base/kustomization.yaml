@@ -5,6 +5,7 @@ kind: Kustomization
 # El nombre del namespace lo fija cada overlay (campo `namespace` + Namespace.yaml).
 resources:
   - networkpolicy-deny-all-traffic.yaml
+  - rolebinding-seguridad.yaml
 
 commonLabels:
   app.kubernetes.io/managed-by: argocd
