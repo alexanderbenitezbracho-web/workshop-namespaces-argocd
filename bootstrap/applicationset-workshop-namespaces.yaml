@@ -11,7 +11,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git
-        revision: main
+        revision: v1
         directories:
           - path: overlays/*/*
           - path: overlays/*/env
@@ -27,7 +27,7 @@ spec:
       project: seguridad
       source:
         repoURL: https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git
-        targetRevision: main
+        targetRevision: v1
         path: '{{.path.path}}'
       destination:
         server: https://kubernetes.default.svc
