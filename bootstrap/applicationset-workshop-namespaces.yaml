@@ -13,12 +13,16 @@ spec:
         repoURL: https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git
         revision: main
         directories:
-          - path: overlays/*
+          - path: overlays/*/*
+          - path: overlays/*/env
+            exclude: true
   template:
     metadata:
-      name: 'ns-{{.path.basename}}'
+      name: 'ns-{{index .path.segments 1}}-{{.path.basename}}'
       labels:
         workshop.openshift.io/etapa: automatizacion-namespace
+        workshop.openshift.io/entorno: '{{index .path.segments 1}}'
+        workshop.openshift.io/proyecto: '{{.path.basename}}'
     spec:
       project: seguridad
       source:
@@ -27,7 +31,7 @@ spec:
         path: '{{.path.path}}'
       destination:
         server: https://kubernetes.default.svc
-        namespace: '{{.path.basename}}'
+        namespace: '{{index .path.segments 1}}-{{.path.basename}}'
       syncPolicy:
         automated:
           prune: true

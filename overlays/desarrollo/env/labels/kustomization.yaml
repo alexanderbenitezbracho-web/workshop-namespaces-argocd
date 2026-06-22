@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# Hereda labels de la base del entorno al Namespace de cada proyecto.
+# Los proyectos incluyen este component con: components: [../env/labels]
+labels:
+  - pairs:
+      workshop.openshift.io/entorno: desarrollo
+      workshop.openshift.io/etapa: automatizacion-namespace
+      app.kubernetes.io/managed-by: argocd
+    includeSelectors: false
+    includeTemplates: true

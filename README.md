@@ -1,65 +1,110 @@
 # Argo CD + Kustomize: namespaces del workshop
 
-GitOps para provisionar los namespaces **desarrollo**, **qa** y **produccion** en OpenShift con **Kustomize** (base común + overlay por entorno) y sincronizarlos con **Argo CD**.
+GitOps para provisionar **múltiples proyectos por entorno** (desarrollo, qa, producción) en OpenShift con **Kustomize** en tres capas (base general → base de entorno → proyecto) y sincronizarlos con **Argo CD**.
 
-Los manifiestos de Argo CD (`AppProject`, `Application`, `ApplicationSet`) se documentan al final; no hay scripts ni ficheros `.yaml` de Argo en este repositorio.
+Los manifiestos de Argo CD (`AppProject`, `ApplicationSet`) están en `bootstrap/`; el resto del repositorio son recursos de namespace.
 
-**Estado**: solo estructura en Git; no aplicar al clúster hasta revisar políticas de red, cuotas y límites por entorno.
+**Estado**: estructura en Git lista para revisión; no aplicar al clúster hasta validar políticas de red, cuotas y límites por entorno.
+
+## Jerarquía Kustomize (3 capas)
+
+```
+base/                          ← capa 1: recursos comunes a todos los entornos
+overlays/<entorno>/env/        ← capa 2: cuotas, límites y NP por entorno
+overlays/<entorno>/<proyecto>/ ← capa 3: namespace del proyecto (Application Argo CD)
+```
+
+Cada proyecto referencia la base de su entorno (`../env`), que a su vez referencia la base general (`../../../base`).
 
 ## Estructura del repositorio
 
 ```
-argocd-namespaces/
+workshop-namespaces-argocd/
 ├── README.md
-├── bootstrap/                          # ApplicationSet → openshift-gitops (no va a overlays/)
+├── bootstrap/                              # ApplicationSet → openshift-gitops
 │   ├── README.md
 │   └── applicationset-workshop-namespaces.yaml
 ├── cluster/
-│   ├── kustomization.yaml              # resources: [] (sin Application Argo por ahora)
+│   ├── kustomization.yaml                  # resources: [] (referencia canónica NP)
 │   └── networkpolicy-deny-all-traffic.yaml
-├── base/
-│   ├── kustomization.yaml              # solo NetworkPolicy (común)
-│   ├── limitrange-default.yaml         # plantilla desarrollo (hard link en overlay)
-│   └── networkpolicy-deny-all-traffic.yaml   # hard link → cluster/...
+├── base/                                   # capa 1 — común a todos los entornos
+│   ├── kustomization.yaml
+│   ├── networkpolicy-deny-all-traffic.yaml
+│   └── rolebinding-seguridad.yaml
 └── overlays/
     ├── desarrollo/
-    │   ├── kustomization.yaml
-    │   ├── namespace.yaml
-    │   ├── limitrange.yaml             # hard link → base/limitrange-default.yaml
-    │   └── resourcequota.yaml
+    │   ├── env/                            # capa 2 — base del entorno desarrollo
+    │   │   ├── kustomization.yaml          # → ../../../base
+    │   │   ├── labels/kustomization.yaml # Component: labels heredados por proyectos
+    │   │   ├── limitrange.yaml
+    │   │   ├── resourcequota.yaml
+    │   │   └── networkpolicy-allow-same-entorno.yaml
+    │   ├── demo-app/                       # capa 3 — proyecto
+    │   │   ├── kustomization.yaml          # → ../env
+    │   │   └── namespace.yaml
+    │   └── portal/
+    │       ├── kustomization.yaml
+    │       └── namespace.yaml
     ├── qa/
-    │   ├── kustomization.yaml
-    │   ├── namespace.yaml
-    │   ├── limitrange.yaml
-    │   └── resourcequota.yaml
+    │   ├── env/
+    │   │   └── ...
+    │   └── demo-app/
+    │       └── ...
     └── produccion/
-        ├── kustomization.yaml
-        ├── namespace.yaml
-        ├── limitrange.yaml
-        └── resourcequota.yaml
+        ├── env/
+        │   └── ...
+        └── demo-app/
+            └── ...
 ```
 
-| Capa | Contenido |
-|------|-----------|
-| `cluster/` | Definición **canónica** de `NetworkPolicy` deny-all (referencia: `compliance-operator/networkpolicies/02-deny-all-traffic.yaml`). No se despliega sola: `NetworkPolicy` es namespaced. |
-| `base/` | `NetworkPolicy` deny-all compartida por todos los entornos. **No** incluye `LimitRange` ni `ResourceQuota` (difieren por entorno). |
-| `overlays/<entorno>/` | `Namespace`, `LimitRange` y `ResourceQuota` alineados entre sí. El nombre de la carpeta = nombre del namespace en el clúster. |
+| Capa | Ruta | Contenido |
+|------|------|-----------|
+| `cluster/` | Definición **canónica** de `NetworkPolicy` deny-all. No se despliega sola (NP es namespaced). |
+| `base/` | `NetworkPolicy` deny-all y `RoleBinding` compartidos por todos los entornos. |
+| `overlays/<entorno>/env/` | `LimitRange`, `ResourceQuota` y `NetworkPolicy` de comunicación interna del entorno. |
+| `overlays/<entorno>/<proyecto>/` | `Namespace` del proyecto con labels de entorno y proyecto. |
 
-No hay `RoleBinding` ni RBAC de `admin-sin-lectura-secrets` en este árbol (gestión de acceso fuera de este proyecto Argo).
+## Convención de nombres
 
-## Entornos gestionados
+| Elemento | Convención | Ejemplo |
+|----------|------------|---------|
+| Carpeta del proyecto | `<proyecto>` (sin prefijo de entorno) | `demo-app`, `portal` |
+| Namespace en el clúster | `<entorno>-<proyecto>` | `desarrollo-demo-app`, `qa-portal` |
+| Application Argo CD | `ns-<entorno>-<proyecto>` | `ns-desarrollo-demo-app` |
 
-| Overlay | Namespace | Recursos propios del overlay |
-|---------|-----------|------------------------------|
-| `desarrollo` | `desarrollo` | `limitrange.yaml`, `resourcequota.yaml` |
-| `qa` | `qa` | `limitrange.yaml`, `resourcequota.yaml` |
-| `produccion` | `produccion` | `limitrange.yaml`, `resourcequota.yaml` |
+El nombre del namespace debe coincidir en `namespace.yaml`, el campo `namespace:` del `kustomization.yaml` del proyecto y el destino del ApplicationSet.
 
-Cada overlay referencia `../../base` (NetworkPolicy) y añade su `LimitRange` + `ResourceQuota`.
+## Labels para NetworkPolicy interna
+
+Los labels del **entorno** se heredan automáticamente desde `overlays/<entorno>/env/labels/` (Kustomize Component). Cada proyecto solo declara el label de **proyecto** en su `kustomization.yaml`.
+
+| Label | Origen | Ejemplo |
+|-------|--------|---------|
+| `workshop.openshift.io/entorno` | `env/labels/` (heredado) | `desarrollo` |
+| `workshop.openshift.io/etapa` | `env/labels/` (heredado) | `automatizacion-namespace` |
+| `app.kubernetes.io/managed-by` | `env/labels/` (heredado) | `argocd` |
+| `workshop.openshift.io/proyecto` | `commonLabels` del proyecto | `demo-app` |
+
+La base de entorno (`overlays/<entorno>/env/`) incluye `networkpolicy-allow-same-entorno.yaml`, que permite tráfico **ingress** desde cualquier namespace con el mismo label `workshop.openshift.io/entorno`. Combinada con `deny-all-traffic` de `base/`, queda:
+
+1. **Deny-all** por defecto (ingress bloqueado).
+2. **Allow same-entorno** — pods accesibles desde otros namespaces del mismo entorno.
+3. Tráfico entre entornos distintos sigue bloqueado.
+
+> **ApplicationSet**: al crear una carpeta `overlays/<entorno>/<proyecto>/`, Argo CD genera automáticamente la Application `ns-<entorno>-<proyecto>`. No hace falta editar el ApplicationSet.
+
+## Proyectos de ejemplo incluidos
+
+| Entorno | Proyecto | Namespace |
+|---------|----------|-----------|
+| `desarrollo` | `demo-app` | `desarrollo-demo-app` |
+| `desarrollo` | `portal` | `desarrollo-portal` |
+| `qa` | `demo-app` | `qa-demo-app` |
+| `produccion` | `demo-app` | `produccion-demo-app` |
 
 ## ResourceQuota por entorno
 
-Límites agregados del namespace (`spec.hard`). Documentación: [Resource Quotas](https://kubernetes.io/docs/concepts/policy/resource-quotas/).
+Límites agregados del namespace (`spec.hard`). Se aplican a **cada proyecto** del entorno por igual.
 
 ### desarrollo
 
@@ -99,11 +144,9 @@ Límites agregados del namespace (`spec.hard`). Documentación: [Resource Quotas
 
 ## LimitRange por entorno
 
-Los `LimitRange` fijan **defaults** y **máximos por contenedor/pod/PVC** para que los pods sin `resources` definidos no rompan la cuota. Documentación: [Limit Range](https://kubernetes.io/docs/concepts/policy/limit-range/).
+Los `LimitRange` fijan **defaults** y **máximos por contenedor/pod/PVC**. QA y producción no comparten un único `LimitRange` en `base/` porque sus cuotas difieren.
 
-**Importante**: las cuotas de QA y producción permiten muchos pods con poco CPU agregado (`requests.cpu: 200m`); por eso no comparten un único `LimitRange` en `base/`.
-
-### desarrollo (`base/limitrange-default.yaml` = `overlays/desarrollo/limitrange.yaml`)
+### desarrollo
 
 | Tipo | defaultRequest | default | max | min |
 |------|----------------|---------|-----|-----|
@@ -127,85 +170,102 @@ Los `LimitRange` fijan **defaults** y **máximos por contenedor/pod/PVC** para q
 | Pod | — | — | 2 CPU, 5Gi mem | — |
 | PVC | — | — | 12Gi | 1Gi |
 
-## Política de red deny-all
-
-Equivalente a `/opt/compliance-operator/networkpolicies/02-deny-all-traffic.yaml`:
-
-- `podSelector: {}` → todos los pods del namespace
-- `policyTypes: [Ingress]` → deniega tráfico entrante (default deny)
-
-Se aplica en cada namespace vía `base/`. El fichero maestro está en `cluster/`; `base/networkpolicy-deny-all-traffic.yaml` es un **hard link** al mismo contenido (Kustomize no admite `resources` fuera del directorio del overlay).
-
-Para permitir tráfico después del deny-all, añade `NetworkPolicy` adicionales en el overlay (p. ej. `03-allow-same-namespace` del compliance-operator).
-
 ## Flujo GitOps
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph git [Repositorio Git]
-    cluster[cluster/networkpolicy]
     base[base/]
-    overlays[overlays/desarrollo qa produccion]
-    cluster -.->|hard link| base
-    overlays --> base
-    overlays --> LR[LimitRange]
-    overlays --> RQ[ResourceQuota]
+    env[overlays/entorno/env/]
+    proj[overlays/entorno/proyecto/]
+    base --> env
+    env --> proj
   end
   subgraph argo [Argo CD]
-    appset[ApplicationSet]
-    appset --> overlays
+    appset[ApplicationSet overlays/*/*]
+    appset --> proj
   end
-  overlays --> NS[Namespace + NP + LR + RQ]
+  proj --> NS[Namespace + NP + LR + RQ + RB]
 ```
 
-1. **ApplicationSet** (generador `git` en `overlays/*`) crea una **Application** por entorno.
-2. Cada Application ejecuta `kustomize build overlays/<entorno>/`.
-3. La carpeta `cluster/` no se sincroniza sola (`kustomization.yaml` con `resources: []`).
+1. **ApplicationSet** (generador `git` en `overlays/*/*`, excluyendo `overlays/*/env`) crea una **Application** por proyecto.
+2. Cada Application ejecuta `kustomize build overlays/<entorno>/<proyecto>/`.
+3. La carpeta `env/` no genera Application propia; es la base intermedia de Kustomize.
 
-## Añadir un namespace / entorno
+## Añadir un proyecto a un entorno existente
 
-1. Crear `overlays/<nombre>/` (el nombre debe ser el del namespace en el clúster).
-2. Añadir `namespace.yaml` con `metadata.name: <nombre>`.
-3. Crear `kustomization.yaml`:
+1. Crear `overlays/<entorno>/<proyecto>/`.
+2. Añadir `namespace.yaml` (solo nombre y anotaciones; **sin labels de entorno**):
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: <entorno>-<proyecto>
+  annotations:
+    openshift.io/description: Descripción del proyecto
+    openshift.io/display-name: Nombre visible
+```
+
+3. Crear `kustomization.yaml` (hereda labels del entorno vía `../env/labels`):
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+components:
+  - ../env/labels
+
 resources:
   - namespace.yaml
-  - ../../base
-  - limitrange.yaml
-  - resourcequota.yaml
-namespace: <nombre>
+  - ../env
+
+namespace: <entorno>-<proyecto>
+
+commonLabels:
+  workshop.openshift.io/proyecto: <proyecto>
 ```
 
-4. Definir `resourcequota.yaml` y `limitrange.yaml` **coherentes** (misma lógica de límites agregados vs defaults por pod).
-5. Commit y push; el ApplicationSet crea la Application `ns-<nombre>`.
+4. Commit y push; el ApplicationSet crea la Application `ns-<entorno>-<proyecto>`.
+
+No hace falta tocar el ApplicationSet ni `env/labels/`: detecta automáticamente carpetas nuevas bajo `overlays/*/*`.
+
+## Añadir un entorno nuevo
+
+1. Crear `overlays/<nuevo-entorno>/env/` copiando la estructura de un entorno existente.
+2. Ajustar `limitrange.yaml`, `resourcequota.yaml` y el valor del label en `networkpolicy-allow-same-entorno.yaml`.
+3. En `env/kustomization.yaml`, actualizar `commonLabels.workshop.openshift.io/entorno`.
+4. Crear al menos un proyecto en `overlays/<nuevo-entorno>/<proyecto>/`.
 
 ## Validación local
 
-Sin aplicar al clúster:
-
 ```bash
-kubectl kustomize /opt/workshop/automatizacion-namespace/argocd-namespaces/overlays/desarrollo
-kubectl kustomize /opt/workshop/automatizacion-namespace/argocd-namespaces/overlays/qa
-kubectl kustomize /opt/workshop/automatizacion-namespace/argocd-namespaces/overlays/produccion
+kubectl kustomize overlays/desarrollo/demo-app
+kubectl kustomize overlays/desarrollo/portal
+kubectl kustomize overlays/qa/demo-app
+kubectl kustomize overlays/produccion/demo-app
 ```
 
 Comprobar recursos generados:
 
 ```bash
-kubectl kustomize .../overlays/desarrollo | grep -E '^kind:'
-# Namespace, ResourceQuota, LimitRange, NetworkPolicy
+kubectl kustomize overlays/desarrollo/demo-app | grep -E '^kind:'
+# Namespace, ResourceQuota, LimitRange, RoleBinding, NetworkPolicy (×2)
+```
+
+Verificar label de entorno en el namespace:
+
+```bash
+kubectl kustomize overlays/desarrollo/demo-app | grep -A5 'kind: Namespace'
 ```
 
 ## Repositorio Git
 
-Remoto: [workshop-namespaces-argocd](https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git), rama `main`. La raíz del repo coincide con esta carpeta (`base/`, `cluster/`, `overlays/`, `bootstrap/`).
+Remoto: [workshop-namespaces-argocd](https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git), rama `main`.
 
 ## Bootstrap Argo CD
 
-El **ApplicationSet** está en `bootstrap/applicationset-workshop-namespaces.yaml` y usa el **AppProject `seguridad`** ya creado en `openshift-gitops`.
+El **ApplicationSet** está en `bootstrap/applicationset-workshop-namespaces.yaml` y usa el **AppProject `seguridad`** en `openshift-gitops`.
 
 ```bash
 oc apply -f bootstrap/applicationset-workshop-namespaces.yaml -n openshift-gitops
@@ -217,30 +277,22 @@ Detalle en [bootstrap/README.md](bootstrap/README.md).
 
 | Objetivo | Dónde editar |
 |----------|----------------|
-| Deny-all en todos los entornos | `cluster/networkpolicy-deny-all-traffic.yaml` (y hard link en `base/`) |
-| Cuota de un entorno | `overlays/<entorno>/resourcequota.yaml` |
-| Defaults/máximos por pod de un entorno | `overlays/<entorno>/limitrange.yaml` (desarrollo: también `base/limitrange-default.yaml`) |
-| Política solo en un entorno | YAML extra en `overlays/<entorno>/` |
+| Deny-all en todos los entornos | `cluster/networkpolicy-deny-all-traffic.yaml` (y copia en `base/`) |
+| Cuota de un entorno | `overlays/<entorno>/env/resourcequota.yaml` |
+| Defaults/máximos por pod de un entorno | `overlays/<entorno>/env/limitrange.yaml` |
+| Comunicación interna del entorno | `overlays/<entorno>/env/networkpolicy-allow-same-entorno.yaml` |
+| Recursos solo de un proyecto | YAML extra en `overlays/<entorno>/<proyecto>/` |
 
-Tras cambiar cuota, revisa el `LimitRange` del mismo overlay para que `defaultRequest`/`max` no impidan usar la cuota ni la agoten con el primer pod.
+Tras cambiar cuota, revisa el `LimitRange` del mismo `env/` para que `defaultRequest`/`max` no impidan usar la cuota ni la agoten con el primer pod.
 
 ## Dependencias
 
 - CNI con soporte de `NetworkPolicy` (OpenShift SDN/OVN).
 - Argo CD / OpenShift GitOps y acceso al repositorio Git.
-- Hard links (si el clon no los trae):  
-  - `base/networkpolicy-deny-all-traffic.yaml` → `cluster/networkpolicy-deny-all-traffic.yaml`  
-  - `overlays/desarrollo/limitrange.yaml` → `base/limitrange-default.yaml`
+- `base/networkpolicy-deny-all-traffic.yaml` debe mantener el mismo contenido que `cluster/networkpolicy-deny-all-traffic.yaml`.
 
-```bash
-ln /opt/workshop/automatizacion-namespace/argocd-namespaces/cluster/networkpolicy-deny-all-traffic.yaml \
-   /opt/workshop/automatizacion-namespace/argocd-namespaces/base/networkpolicy-deny-all-traffic.yaml
-ln /opt/workshop/automatizacion-namespace/argocd-namespaces/base/limitrange-default.yaml \
-   /opt/workshop/automatizacion-namespace/argocd-namespaces/overlays/desarrollo/limitrange.yaml
-```
-
-## Orden de despliegue recomendado (cuando aplique)
+## Orden de despliegue recomendado
 
 1. AppProject **`seguridad`** (ya existente en el clúster)
 2. `oc apply -f bootstrap/applicationset-workshop-namespaces.yaml -n openshift-gitops`
-3. Por namespace: comprobar `Namespace`, `ResourceQuota`, `LimitRange`, `NetworkPolicy` `deny-all-traffic`
+3. Por proyecto: comprobar `Namespace`, labels de entorno, `ResourceQuota`, `LimitRange`, `NetworkPolicy` deny-all y allow-same-entorno

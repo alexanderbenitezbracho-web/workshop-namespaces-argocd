@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ResourceQuota
 metadata:
-  name: desarrollo-quota
+  name: workshop-quota
 spec:
   hard:
     count/deployments.apps: "2"

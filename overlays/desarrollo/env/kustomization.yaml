@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base del entorno desarrollo: recursos comunes a todos los proyectos del entorno.
+# Cada proyecto referencia este directorio (../env) y hereda labels vía ../env/labels.
+resources:
+  - ../../../base
+  - limitrange.yaml
+  - resourcequota.yaml
+  - networkpolicy-allow-same-entorno.yaml
+
+commonLabels:
+  workshop.openshift.io/entorno: desarrollo

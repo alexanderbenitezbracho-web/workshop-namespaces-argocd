@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: desarrollo-portal
+  annotations:
+    openshift.io/description: Proyecto portal en desarrollo
+    openshift.io/display-name: Portal (Desarrollo)

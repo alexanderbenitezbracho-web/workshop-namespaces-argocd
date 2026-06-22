@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ResourceQuota
 metadata:
-  name: produccion-quota
+  name: workshop-quota
 spec:
   hard:
     count/deployments.apps: "50"
