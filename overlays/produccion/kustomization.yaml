@@ -1,0 +1,5 @@
+components:
+  - ../env/labels
+
+resources:
+  - ../env
