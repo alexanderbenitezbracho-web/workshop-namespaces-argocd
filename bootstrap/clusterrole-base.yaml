@@ -5,6 +5,17 @@ metadata:
   labels:
     rbac.openshift.io/role: app-deployer-restricted
 rules:
+  # Visibilidad del proyecto en consola y `oc get projects` (mismo patrón que edit/view).
+  - apiGroups: [""]
+    resources:
+      - namespaces
+    verbs:
+      - get
+  - apiGroups: ["", "project.openshift.io"]
+    resources:
+      - projects
+    verbs:
+      - get
   - apiGroups: ["apps"]
     resources:
       - daemonsets
