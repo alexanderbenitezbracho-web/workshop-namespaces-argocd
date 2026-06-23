@@ -6,6 +6,7 @@ kind: Kustomization
 resources:
   - networkpolicy-deny-all-traffic.yaml
   - rolebinding-seguridad.yaml
+  - clusterrole-base.yaml
 
 commonLabels:
   app.kubernetes.io/managed-by: argocd
