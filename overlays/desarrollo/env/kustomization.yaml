@@ -8,6 +8,7 @@ resources:
   - limitrange.yaml
   - resourcequota.yaml
   - networkpolicy-allow-same-entorno.yaml
+  - rolebinding-infrati.yaml
 
 commonLabels:
   workshop.openshift.io/entorno: desarrollo
