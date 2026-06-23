@@ -4,10 +4,8 @@ metadata:
   name: workshop-quota
 spec:
   hard:
-    count/deployments.apps: "20"
-    requests.cpu: "200m"
-    limits.cpu: "1500m"
-    requests.memory: 500Mi
-    limits.memory: 5Gi
-    requests.storage: 5Gi
-    pods: "30"
+    requests.cpu: "600m"
+    limits.cpu: "1"
+    requests.memory: 1Gi
+    limits.memory: 2Gi
+    requests.storage: 2Gi

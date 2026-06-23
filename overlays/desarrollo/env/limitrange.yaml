@@ -1,5 +1,3 @@
-# Alineado con overlays/desarrollo/resourcequota.yaml (2 pods, 1 CPU request, 2 CPU limit, 500Mi/2Gi mem, 2Gi PVC).
-# QA y producción usan limitrange propio en su overlay (cuotas distintas).
 apiVersion: v1
 kind: LimitRange
 metadata:
@@ -7,24 +5,15 @@ metadata:
 spec:
   limits:
     - type: Container
-      default:
-        cpu: "1"
-        memory: 1Gi
       defaultRequest:
-        cpu: 500m
-        memory: 250Mi
-      max:
-        cpu: "1"
-        memory: 1Gi
-      min:
         cpu: 100m
         memory: 128Mi
-    - type: Pod
-      max:
-        cpu: "2"
-        memory: 2Gi
-    - type: PersistentVolumeClaim
-      max:
-        storage: 2Gi
+      default:
+        cpu: 250m
+        memory: 400Mi
       min:
-        storage: 500Mi
+        cpu: 50m
+        memory: 64Mi
+      max:
+        cpu: 250m
+        memory: 500Mi
