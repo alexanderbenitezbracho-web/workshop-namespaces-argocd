@@ -1,0 +1,24 @@
+# Aplicar en el clúster:
+#   oc apply -f bootstrap/application-test.yaml -n openshift-gitops
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ns-test
+  namespace: openshift-gitops
+  labels:
+    workshop.openshift.io/etapa: automatizacion-namespace
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git
+    targetRevision: simple
+    path: test
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: test
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

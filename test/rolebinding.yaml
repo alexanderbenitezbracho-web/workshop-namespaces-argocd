@@ -7,6 +7,6 @@ roleRef:
   kind: ClusterRole
   name: view
 subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: seguridad
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: seguridad

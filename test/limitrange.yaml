@@ -1,4 +1,3 @@
-# Alineado con overlays/produccion/resourcequota.yaml
 apiVersion: v1
 kind: LimitRange
 metadata:
@@ -7,23 +6,23 @@ spec:
   limits:
     - type: Container
       default:
-        cpu: 50m
-        memory: 256Mi
+        cpu: "1"
+        memory: 1Gi
       defaultRequest:
-        cpu: 40m
-        memory: 100Mi
+        cpu: 500m
+        memory: 250Mi
       max:
-        cpu: "2"
-        memory: 5Gi
+        cpu: "1"
+        memory: 1Gi
       min:
-        cpu: 40m
-        memory: 100Mi
+        cpu: 100m
+        memory: 128Mi
     - type: Pod
       max:
         cpu: "2"
-        memory: 5Gi
+        memory: 2Gi
     - type: PersistentVolumeClaim
       max:
-        storage: 12Gi
+        storage: 2Gi
       min:
-        storage: 1Gi
+        storage: 500Mi
