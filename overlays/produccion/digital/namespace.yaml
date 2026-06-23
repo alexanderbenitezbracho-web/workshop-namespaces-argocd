@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: produccion-digital
-  annotations:
-    openshift.io/description: Proyecto digital en producción
-    openshift.io/display-name: Digital (Producción)
