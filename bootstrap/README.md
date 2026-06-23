@@ -2,14 +2,11 @@
 
 Manifiestos que viven en el **clúster** (namespace `openshift-gitops`), no en los namespaces `desarrollo` / `qa` / `produccion`.
 
-## AppProject
-
-Se usa el proyecto existente **`seguridad`** (`openshift-gitops`), con acceso amplio a repos y destinos. No hay `appproject.yaml` en este directorio.
-
-## ApplicationSet
+## Recursos
 
 | Fichero | Recurso | Efecto |
 |---------|---------|--------|
+| `appproject-seguridad.yml` | `AppProject` `seguridad` | Proyecto Argo CD con acceso a repos y destinos del workshop |
 | `applicationset-workshop-namespaces.yaml` | `ApplicationSet` `workshop-namespaces` | Una `Application` por carpeta en `overlays/*` del repo GitHub |
 
 Repositorio: [workshop-namespaces-argocd](https://github.com/alexanderbenitezbracho-web/workshop-namespaces-argocd.git), rama `main`.
@@ -23,18 +20,39 @@ Applications generadas:
 ## Despliegue
 
 ```bash
-oc apply -f /opt/workshop/automatizacion-namespace/argocd-namespaces/bootstrap/applicationset-workshop-namespaces.yaml \
-  -n openshift-gitops
+cd /opt/workshop/automatizacion-namespace/workshop-namespaces-argocd
+
+# 1. AppProject (omitir si ya existe)
+oc get appproject seguridad -n openshift-gitops 2>/dev/null \
+  || oc apply -f bootstrap/appproject-seguridad.yml
+
+# 2. ApplicationSet
+oc apply -f bootstrap/applicationset-workshop-namespaces.yaml -n openshift-gitops
 ```
 
 Comprobar:
 
 ```bash
 oc get applicationset workshop-namespaces -n openshift-gitops
-oc get applications -n openshift-gitops -l workshop.openshift.io/etapa=automatizacion-namespace
+oc get applications.argoproj.io -n openshift-gitops \
+  -l workshop.openshift.io/etapa=automatizacion-namespace
 ```
 
 Si el repo es privado, registra credenciales en Argo CD antes del sync.
+
+## Eliminación
+
+```bash
+oc delete applicationset workshop-namespaces -n openshift-gitops
+
+# Namespaces residuales (si aplica)
+for ns in desarrollo qa produccion; do
+  oc delete ns "$ns" --ignore-not-found --wait=false
+done
+
+# AppProject (solo si no lo usa otra Application)
+oc delete appproject seguridad -n openshift-gitops --ignore-not-found
+```
 
 ## Estructura del repo Git
 
